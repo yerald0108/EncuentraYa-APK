@@ -8,7 +8,7 @@ import {
   ScrollView,
   Image,
   Dimensions,
-  Platform,
+  PanResponder,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -18,10 +18,11 @@ import { estaAbierto, getHorarioHoy } from '../services/api';
 import { CATEGORIAS } from '../types/mipyme.types';
 import { Colors, Typography, Spacing, Radius, Shadows, Sizes } from '../theme/theme';
 import { useTabBarStore } from '../stores/useTabBarStore';
+import { useSavedStore, SavedStore } from '../stores/useSavedStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SHEET_HEIGHT    = SCREEN_HEIGHT * 0.82;
-const DRAG_THRESHOLD  = 80;
+const SHEET_HEIGHT   = SCREEN_HEIGHT * 0.82;
+const DRAG_THRESHOLD = SHEET_HEIGHT * 0.15;
 
 // ─────────────────────────────────────────────────────
 // SKELETON
@@ -49,7 +50,15 @@ function SkeletonBox({
   }, []);
 
   return (
-    <Animated.View style={{ width, height, borderRadius, backgroundColor: Colors.neutral[200], opacity }} />
+    <Animated.View
+      style={{
+        width,
+        height,
+        borderRadius,
+        backgroundColor: Colors.neutral[200],
+        opacity,
+      }}
+    />
   );
 }
 
@@ -72,83 +81,113 @@ function ProductoRow({ nombre, precio }: { nombre: string; precio: number }) {
 // PROPS
 // ─────────────────────────────────────────────────────
 interface MipymeBottomSheetProps {
-  mipymeId:    string | null;
-  onClose:     () => void;
+  mipymeId: string | null;
+  onClose:  () => void;
 }
 
 // ─────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────────────
-export default function MipymeBottomSheet({
-  mipymeId,
-  onClose,
-}: MipymeBottomSheetProps) {
-  const insets      = useSafeAreaInsets();
-  const translateY  = useRef(new Animated.Value(SHEET_HEIGHT)).current;
-  const backdropOp  = useRef(new Animated.Value(0)).current;
-  const dragY       = useRef(new Animated.Value(0)).current;
-  const scrollRef   = useRef<ScrollView>(null);
-  const isScrolling = useRef(false);
-  const dragStart   = useRef(0);
-  const [guardado, setGuardado] = useState(false);
+export default function MipymeBottomSheet({ mipymeId, onClose }: MipymeBottomSheetProps) {
+  const insets                  = useSafeAreaInsets();
+  const translateY              = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const backdropOp              = useRef(new Animated.Value(0)).current;
+  const [scrollEnabled, setScrollEnabled] = useState(false);
+  const scrollRef               = useRef<ScrollView>(null);
+  const scrollOffsetY           = useRef(0);
 
   const { hideTabBar, showTabBar } = useTabBarStore();
   const { mipyme, horarios, productos, isLoading } = useMipymeDetalle(mipymeId);
 
+  // Bookmark store
+  const isSaved     = useSavedStore((s: SavedStore) => s.isSaved);
+  const toggleSaved = useSavedStore((s: SavedStore) => s.toggleSaved);
+  const guardado     = mipymeId ? isSaved(mipymeId) : false;
+
   // ── Abrir ──────────────────────────────────────────
   const openSheet = useCallback(() => {
     hideTabBar();
+    setScrollEnabled(false);
+    translateY.stopAnimation();
     Animated.parallel([
       Animated.spring(translateY, {
-        toValue:  0,
-        tension:  65,
-        friction: 11,
+        toValue:         0,
+        tension:         65,
+        friction:        11,
         useNativeDriver: true,
       }),
       Animated.timing(backdropOp, {
-        toValue:  1,
-        duration: 300,
+        toValue:         1,
+        duration:        300,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, [hideTabBar]);
+    ]).start(() => {
+      setScrollEnabled(true);
+    });
+  }, [hideTabBar, translateY, backdropOp]);
 
   // ── Cerrar ─────────────────────────────────────────
   const closeSheet = useCallback(() => {
+    setScrollEnabled(false);
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue:  SHEET_HEIGHT,
-        duration: 300,
+        toValue:         SHEET_HEIGHT,
+        duration:        300,
         useNativeDriver: true,
       }),
       Animated.timing(backdropOp, {
-        toValue:  0,
-        duration: 280,
+        toValue:         0,
+        duration:        280,
         useNativeDriver: true,
       }),
     ]).start(() => {
       showTabBar();
-      setGuardado(false);
       onClose();
     });
-  }, [onClose, showTabBar]);
+  }, [onClose, showTabBar, translateY, backdropOp]);
 
   useEffect(() => {
     if (mipymeId) {
       translateY.setValue(SHEET_HEIGHT);
-      dragY.setValue(0);
+      scrollOffsetY.current = 0;
       openSheet();
     }
   }, [mipymeId]);
 
+  // ── PanResponder — drag para cerrar ───────────────
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => {
+        const isDownward      = g.dy > 0;
+        const isAtTop         = scrollOffsetY.current <= 0;
+        const isMoreVertical  = Math.abs(g.dy) > Math.abs(g.dx);
+        return isDownward && isAtTop && isMoreVertical;
+      },
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) {
+          translateY.setValue(g.dy);
+        }
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > DRAG_THRESHOLD || g.vy > 0.5) {
+          closeSheet();
+        } else {
+          Animated.spring(translateY, {
+            toValue:         0,
+            tension:         65,
+            friction:        11,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
   if (!mipymeId) return null;
 
-  const abierto         = horarios.length > 0 ? estaAbierto(horarios) : null;
+  const abierto         = horarios.length > 0 ? estaAbierto(horarios)   : null;
   const horarioTexto    = horarios.length > 0 ? getHorarioHoy(horarios) : null;
   const categoriaConfig = mipyme ? CATEGORIAS[mipyme.categoria] : null;
-
-  // La posición final del sheet combina la animación de entrada + el drag
-  const sheetTranslate = Animated.add(translateY, dragY);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -158,7 +197,11 @@ export default function MipymeBottomSheet({
         style={[styles.backdrop, { opacity: backdropOp }]}
         pointerEvents="auto"
       >
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeSheet} activeOpacity={1} />
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={closeSheet}
+          activeOpacity={1}
+        />
       </Animated.View>
 
       {/* ── SHEET ── */}
@@ -166,34 +209,36 @@ export default function MipymeBottomSheet({
         style={[
           styles.sheet,
           { height: SHEET_HEIGHT + insets.bottom },
-          { transform: [{ translateY: sheetTranslate }] },
+          { transform: [{ translateY }] },
         ]}
+        {...panResponder.panHandlers}
       >
-        {/* Handle + Header */}
+
+        {/* ── HEADER — handle + botones ── */}
         <View style={styles.headerArea}>
-          {/* Handle de drag */}
           <View style={styles.handleBar} />
 
-          {/* Botones X y Guardar */}
           <View style={styles.headerButtons}>
+            {/* Bookmark */}
+            <TouchableOpacity
+              style={[styles.headerBtn, guardado && styles.headerBtnSaved]}
+              onPress={() => mipymeId && toggleSaved(mipymeId)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather
+                name="bookmark"
+                size={19}
+                color={guardado ? Colors.neutral[0] : Colors.neutral[600]}
+              />
+            </TouchableOpacity>
+
+            {/* Cerrar */}
             <TouchableOpacity
               style={styles.headerBtn}
               onPress={closeSheet}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="x" size={20} color={Colors.neutral[600]} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.headerBtn, guardado && styles.headerBtnActive]}
-              onPress={() => setGuardado(g => !g)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather
-                name={guardado ? 'bookmark' : 'bookmark'}
-                size={20}
-                color={guardado ? Colors.neutral[0] : Colors.neutral[600]}
-              />
+              <Feather name="x" size={19} color={Colors.neutral[600]} />
             </TouchableOpacity>
           </View>
         </View>
@@ -202,18 +247,18 @@ export default function MipymeBottomSheet({
         <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          bounces={true}
+          bounces
           scrollEventThrottle={16}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
-          // Estas dos props son clave para evitar que el scroll mueva el mapa
-          onScrollBeginDrag={() => { isScrolling.current = true; }}
-          onScrollEndDrag={()   => { isScrolling.current = false; }}
-          onMomentumScrollBegin={() => { isScrolling.current = true; }}
-          onMomentumScrollEnd={()   => { isScrolling.current = false; }}
+          scrollEnabled={scrollEnabled}
+          onScroll={(e) => {
+            scrollOffsetY.current = e.nativeEvent.contentOffset.y;
+          }}
+          onScrollBeginDrag={() => { setScrollEnabled(true); }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
           nestedScrollEnabled
         >
           {isLoading ? (
-            // ── SKELETON ──────────────────────────────
+            // ── SKELETON ────────────────────────────
             <View>
               <SkeletonBox width={"100%" as `${number}%`} height={200} borderRadius={0} />
               <View style={{ padding: Spacing.screenPadding, gap: 10 }}>
@@ -252,13 +297,17 @@ export default function MipymeBottomSheet({
               {/* ── CUERPO ── */}
               <View style={styles.body}>
 
-                {/* Badges */}
+                {/* Badges categoría + verificada */}
                 <View style={styles.badgesRow}>
                   <View style={[
                     styles.categoriaBadge,
-                    { backgroundColor: (categoriaConfig?.color ?? '#000') + '18' }
+                    { backgroundColor: (categoriaConfig?.color ?? '#000') + '18' },
                   ]}>
-                    <Feather name={categoriaConfig?.icon as any} size={12} color={categoriaConfig?.color} />
+                    <Feather
+                      name={categoriaConfig?.icon as any}
+                      size={12}
+                      color={categoriaConfig?.color}
+                    />
                     <Text style={[styles.categoriaText, { color: categoriaConfig?.color }]}>
                       {categoriaConfig?.label}
                     </Text>
@@ -281,9 +330,8 @@ export default function MipymeBottomSheet({
 
                 <View style={styles.divider} />
 
-                {/* Info */}
+                {/* Info rows */}
                 <View style={styles.infoContainer}>
-
                   <View style={styles.infoRow}>
                     <View style={styles.infoIcon}>
                       <Feather name="map-pin" size={15} color={Colors.primary[500]} />
@@ -294,14 +342,21 @@ export default function MipymeBottomSheet({
                   {abierto !== null && (
                     <View style={styles.infoRow}>
                       <View style={styles.infoIcon}>
-                        <Feather name="clock" size={15} color={abierto ? Colors.success : Colors.error} />
+                        <Feather
+                          name="clock"
+                          size={15}
+                          color={abierto ? Colors.success : Colors.error}
+                        />
                       </View>
                       <View style={{ flex: 1, gap: 4 }}>
                         <View style={[
                           styles.estadoBadge,
-                          { backgroundColor: abierto ? Colors.success + '18' : Colors.error + '18' }
+                          { backgroundColor: abierto ? Colors.success + '18' : Colors.error + '18' },
                         ]}>
-                          <Text style={[styles.estadoText, { color: abierto ? Colors.success : Colors.error }]}>
+                          <Text style={[
+                            styles.estadoText,
+                            { color: abierto ? Colors.success : Colors.error },
+                          ]}>
                             {abierto ? 'Abierto ahora' : 'Cerrado'}
                           </Text>
                         </View>
@@ -349,7 +404,7 @@ export default function MipymeBottomSheet({
                   </>
                 )}
 
-                {/* Botón ver productos */}
+                {/* Botón ver todos los productos */}
                 <TouchableOpacity
                   style={styles.verProductosBtn}
                   activeOpacity={0.85}
@@ -398,10 +453,10 @@ const styles = StyleSheet.create({
 
   // Header
   headerArea: {
-    paddingTop:       10,
+    paddingTop:        12,
     paddingHorizontal: Spacing.screenPadding,
-    paddingBottom:    8,
-    alignItems:       'center',
+    paddingBottom:     10,
+    alignItems:        'center',
     borderBottomWidth: 1,
     borderBottomColor: Colors.neutral[100],
   },
@@ -413,9 +468,9 @@ const styles = StyleSheet.create({
     marginBottom:    12,
   },
   headerButtons: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    width:          '100%',
+    flexDirection: 'row',
+    alignSelf:     'flex-end',
+    gap:           8,
   },
   headerBtn: {
     width:           40,
@@ -425,7 +480,7 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  headerBtnActive: {
+  headerBtnSaved: {
     backgroundColor: Colors.primary[500],
   },
 
@@ -596,7 +651,7 @@ const styles = StyleSheet.create({
     marginTop:  Spacing['2'],
   },
 
-  // Botón
+  // Botón principal
   verProductosBtn: {
     flexDirection:   'row',
     alignItems:      'center',

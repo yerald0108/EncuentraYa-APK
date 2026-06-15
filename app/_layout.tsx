@@ -11,8 +11,8 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { View, StyleSheet } from 'react-native';
 import { Colors } from '../src/theme/theme';
+import { useSavedStore } from '../src/stores/useSavedStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,6 +24,28 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function AppContent() {
+  const hydrate = useSavedStore(s => s.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, []);
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen
+        name="mipyme/[id]"
+        options={{
+          presentation: 'card',
+          animation:    'slide_from_right',
+        }}
+      />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -39,32 +61,14 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="light" backgroundColor={Colors.primary[500]} />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen
-            name="mipyme/[id]"
-            options={{
-              presentation: 'card',
-              animation: 'slide_from_right',
-            }}
-          />
-        </Stack>
+        <AppContent />
       </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-});

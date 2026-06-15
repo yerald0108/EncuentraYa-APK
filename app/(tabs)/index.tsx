@@ -21,6 +21,7 @@ import { Colors, Spacing, Sizes, Typography } from '../../src/theme/theme';
 import { useMipymes, useBuscarMipymes } from '../../src/hooks/useMipymes';
 import MipymeBottomSheet from '../../src/components/MipymeBottomSheet';
 import { useTabBarStore } from '../../src/stores/useTabBarStore';
+import ErrorView from '../../src/components/ui/ErrorView';
 
 const HABANA_REGION = {
   latitude:       23.1330,
@@ -150,10 +151,13 @@ export default function MainMapScreen() {
 
       {/* ESTADO DE ERROR */}
       {isError && (
-        <TouchableOpacity style={styles.errorBadge} onPress={() => refetch()}>
-          <Feather name="wifi-off" size={14} color={Colors.error} />
-          <Text style={styles.errorText}>Error de conexión — toca para reintentar</Text>
-        </TouchableOpacity>
+        <View style={styles.errorBadgeContainer}>
+          <ErrorView
+            compact
+            title="Error de conexión"
+            onRetry={() => refetch()}
+          />
+        </View>
       )}
 
       {/* BOTÓN CENTRAR */}
@@ -222,29 +226,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.neutral[700],
   },
-  errorBadge: {
-    position: 'absolute',
-    top: 140,
-    alignSelf: 'center',
-    flexDirection: 'row',
+    errorBadgeContainer: {
+    position:  'absolute',
+    top:       140,
+    left:      Spacing.screenPadding,
+    right:     Spacing.screenPadding,
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.neutral[0],
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: Colors.error,
-  },
-  errorText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: Typography.size.sm,
-    color: Colors.error,
   },
   centerButton: {
     position: 'absolute',

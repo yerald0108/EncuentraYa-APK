@@ -23,11 +23,17 @@ export function useMipymeDetalle(id: string | null) {
     staleTime: 1000 * 60 * 5,
   });
 
+  const isLoading =
+    mipymeQuery.isLoading ||
+    horariosQuery.isLoading ||
+    productosQuery.isLoading;
+
   return {
-    mipyme:    mipymeQuery.data ?? null,
+    mipyme:    mipymeQuery.data   ?? null,
     horarios:  horariosQuery.data ?? [],
     productos: productosQuery.data ?? [],
-    isLoading: mipymeQuery.isLoading || horariosQuery.isLoading,
+    isLoading,
     isError:   mipymeQuery.isError,
+    refetch:   mipymeQuery.refetch,
   };
 }
