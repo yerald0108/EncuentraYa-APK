@@ -22,6 +22,7 @@ import { Producto } from '../../src/types/product.types';
 import ProductoCard from '../../src/components/ProductoCard';
 import { Colors, Typography, Spacing, Radius, Shadows, Sizes } from '../../src/theme/theme';
 import ErrorView from '../../src/components/ui/ErrorView';
+import EmptyState from '../../src/components/ui/EmptyState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const HEADER_IMAGE_HEIGHT = SCREEN_HEIGHT * 0.38;
@@ -331,11 +332,11 @@ export default function MipymeDetailScreen() {
   // Estado vacío de productos
   const ListEmpty = () => (
     <View style={styles.emptyProductos}>
-      <Feather name="package" size={40} color={Colors.neutral[300]} />
-      <Text style={styles.emptyTitle}>Sin productos aún</Text>
-      <Text style={styles.emptySubtitle}>
-        Esta mipyme no ha publicado productos todavía
-      </Text>
+      <EmptyState
+        icon="package"
+        title="Sin productos aún"
+        subtitle="Esta mipyme no ha publicado productos todavía."
+      />
     </View>
   );
 
@@ -619,18 +620,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing['10'],
     paddingHorizontal: Spacing['8'],
     gap:             Spacing['3'],
-  },
-  emptyTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize:   Typography.size.lg,
-    color:      Colors.neutral[700],
-  },
-  emptySubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize:   Typography.size.base,
-    color:      Colors.neutral[500],
-    textAlign:  'center',
-    lineHeight: 22,
   },
 
   // Error screen

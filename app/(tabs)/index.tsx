@@ -17,6 +17,7 @@ import { MipymePreview, MipymeCategoria } from '../../src/types/mipyme.types';
 import MapPin from '../../src/components/MapPin';
 import SearchBar from '../../src/components/SearchBar';
 import CategoryChip from '../../src/components/ui/CategoryChip';
+import EmptyState from '../../src/components/ui/EmptyState';
 import { Colors, Spacing, Sizes, Typography } from '../../src/theme/theme';
 import { useMipymes, useBuscarMipymes } from '../../src/hooks/useMipymes';
 import MipymeBottomSheet from '../../src/components/MipymeBottomSheet';
@@ -160,6 +161,28 @@ export default function MainMapScreen() {
         </View>
       )}
 
+      {/* EMPTY STATE — sin resultados */}
+      {!isLoading && !isError && mipymesMostradas.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <EmptyState
+            compact
+            icon="search"
+            title={
+              searchText.trim().length >= 2
+                ? 'Sin resultados'
+                : 'Sin mipymes en esta categoría'
+            }
+            subtitle={
+              searchText.trim().length >= 2
+                ? `No encontramos mipymes para "${searchText}"`
+                : 'Prueba seleccionando otra categoría'
+            }
+            actionLabel={searchText.trim().length >= 2 ? 'Limpiar búsqueda' : undefined}
+            onAction={searchText.trim().length >= 2 ? handleClearSearch : undefined}
+          />
+        </View>
+      )}
+
       {/* BOTÓN CENTRAR */}
       <TouchableOpacity
         style={styles.centerButton}
@@ -226,11 +249,18 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.neutral[700],
   },
-    errorBadgeContainer: {
+  errorBadgeContainer: {
     position:  'absolute',
     top:       140,
     left:      Spacing.screenPadding,
     right:     Spacing.screenPadding,
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    position:   'absolute',
+    bottom:     120,
+    left:       Spacing.screenPadding,
+    right:      Spacing.screenPadding,
     alignItems: 'center',
   },
   centerButton: {

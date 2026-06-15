@@ -19,6 +19,8 @@ import { CATEGORIAS } from '../types/mipyme.types';
 import { Colors, Typography, Spacing, Radius, Shadows, Sizes } from '../theme/theme';
 import { useTabBarStore } from '../stores/useTabBarStore';
 import { useSavedStore, SavedStore } from '../stores/useSavedStore';
+import Toast from './ui/Toast';
+import { useToast } from '../hooks/useToast';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT   = SCREEN_HEIGHT * 0.82;
@@ -95,6 +97,7 @@ export default function MipymeBottomSheet({ mipymeId, onClose }: MipymeBottomShe
   const [scrollEnabled, setScrollEnabled] = useState(false);
   const scrollRef               = useRef<ScrollView>(null);
   const scrollOffsetY           = useRef(0);
+  const { toast, showToast, hideToast } = useToast();
 
   const { hideTabBar, showTabBar } = useTabBarStore();
   const { mipyme, horarios, productos, isLoading } = useMipymeDetalle(mipymeId);
@@ -222,7 +225,16 @@ export default function MipymeBottomSheet({ mipymeId, onClose }: MipymeBottomShe
             {/* Bookmark */}
             <TouchableOpacity
               style={[styles.headerBtn, guardado && styles.headerBtnSaved]}
-              onPress={() => mipymeId && toggleSaved(mipymeId)}
+              onPress={() => {
+                if (mipymeId) {
+                  const estaGuardado = guardado;
+                  toggleSaved(mipymeId);
+                  showToast(
+                    estaGuardado ? 'Eliminado de guardados' : 'Guardado correctamente',
+                    estaGuardado ? 'info' : 'success'
+                  );
+                }
+              }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Feather
@@ -427,6 +439,13 @@ export default function MipymeBottomSheet({ mipymeId, onClose }: MipymeBottomShe
           )}
         </ScrollView>
       </Animated.View>
+      {/* Toast */}
+        <Toast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={hideToast}
+        />
     </View>
   );
 }

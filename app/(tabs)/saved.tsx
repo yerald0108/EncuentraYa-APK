@@ -19,6 +19,8 @@ import { getMipymeById } from '../../src/services/api';
 import { CATEGORIAS } from '../../src/types/mipyme.types';
 import { Mipyme } from '../../src/types/mipyme.types';
 import { Colors, Typography, Spacing, Radius, Shadows, Sizes } from '../../src/theme/theme';
+import Toast from '../../src/components/ui/Toast';
+import { useToast } from '../../src/hooks/useToast';
 
 // ─────────────────────────────────────────
 // SKELETON DE TARJETA
@@ -199,6 +201,7 @@ export default function SavedScreen() {
   const savedIds    = useSavedStore((s: SavedStore) => s.savedIds);
   const toggleSaved = useSavedStore((s: SavedStore) => s.toggleSaved);
   const isHydrated  = useSavedStore((s: SavedStore) => s.isHydrated);
+  const { toast, showToast, hideToast } = useToast();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -223,7 +226,8 @@ export default function SavedScreen() {
 
   const handleRemove = useCallback((id: string) => {
     toggleSaved(id);
-  }, [toggleSaved]);
+    showToast('Eliminado de guardados', 'info');
+  }, [toggleSaved, showToast]);
 
   const handlePress = useCallback((id: string) => {
     router.push(`/mipyme/${id}` as any);
@@ -275,6 +279,12 @@ export default function SavedScreen() {
           }
         />
       )}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
     </SafeAreaView>
   );
 }
