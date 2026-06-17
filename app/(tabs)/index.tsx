@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,6 +23,8 @@ import { useMipymes, useBuscarMipymes } from '../../src/hooks/useMipymes';
 import MipymeBottomSheet from '../../src/components/MipymeBottomSheet';
 import { useTabBarStore } from '../../src/stores/useTabBarStore';
 import ErrorView from '../../src/components/ui/ErrorView';
+import Toast from '../../src/components/ui/Toast';
+import { useToast } from '../../src/hooks/useToast';
 
 const HABANA_REGION = {
   latitude:       23.1330,
@@ -43,11 +45,21 @@ export default function MainMapScreen() {
   const [searchText, setSearchText]             = useState('');
   const [categoriaActiva, setCategoriaActiva]   = useState<MipymeCategoria | 'todos'>('todos');
   const { hideTabBar, showTabBar } = useTabBarStore();
+  const { toast, showToast, hideToast } = useToast();
+  const yaNotificoCarga = useRef(false);
 
   // Datos desde Supabase
   const { data: mipymesData, isLoading, isError, refetch } = useMipymes(
     categoriaActiva === 'todos' ? undefined : categoriaActiva
   );
+
+  useEffect(() => {
+    if (!isLoading && !isError && mipymesData && mipymesData.length > 0 && !yaNotificoCarga.current) {
+      showToast(`${mipymesData.length} mipymes cargadas correctamente`, 'success');
+      yaNotificoCarga.current = true;
+    }
+  }, [isLoading, isError, mipymesData]);
+
   const { data: resultadosBusqueda } = useBuscarMipymes(searchText);
 
   // Si hay búsqueda activa usar esos resultados, si no las del mapa
@@ -98,6 +110,10 @@ export default function MainMapScreen() {
         showsCompass={false}
         rotateEnabled={false}
         toolbarEnabled={false}
+        // Desactiva gestos del mapa cuando el sheet está abierto
+        scrollEnabled={!selectedId}
+        zoomEnabled={!selectedId}
+        pitchEnabled={!selectedId}
       >
         {mipymesMostradas.map((mipyme) => (
           <Marker
@@ -202,6 +218,15 @@ export default function MainMapScreen() {
           />
         </SafeAreaView>
       )}
+
+      {/* Toast de carga */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
+
     </View>
   );
 }
